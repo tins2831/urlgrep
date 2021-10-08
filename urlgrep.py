@@ -21,13 +21,15 @@ def _gen_endp_exts():
 WORKERS = 4 # number of threads to use and the number of file chunks to generate
 
 # https://github.com/GerbenJavado/LinkFinder/blob/master/linkfinder.py#L29
-REGEX = ("(?:\"|')(((?:[a-zA-Z]{1,10}://|//)[^\"'/]{1,}\\.[a-zA-Z]{2,}[^\"'" +
-        "]{0,})|((?:/|\\.\\./|\\./)[^\"'><,;| *()(%%$^/\\\\[\\]][^\"'><,;|" +
-        "()]{1,})|([a-zA-Z0-9_\\-/]{1,}/[a-zA-Z0-9_\\-/]{1,}\\.(?:[a-zA-Z]" +
-        "{1,4}|action)(?:[\\?|#][^\"|']{0,}|))|([a-zA-Z0-9_\\-/]{1,}/[a-zA" +
-        "-Z0-9_\\-/]{3,}(?:[\\?|#][^\"|']{0,}|))|([a-zA-Z0-9_\\-]{1,}\\.(?" +
-        ":%s)(?:[\\?|#][^\"|']{0" +
-        ",}|)))(?:\"|')")
+REGEX = (
+    "(?:\"|')(((?:[a-zA-Z]{1,10}://|//)(?:[^\"'/]){1,}\\.[a-zA-Z0-9]+" +
+    "[^\"']{0,})|((?:/|\\.\\./|\\./)[^\"'><,;| *()(%%$^/\\\\[\\]][^\"" +
+    "'><,;|()]{1,})|([a-zA-Z0-9_\\-/]{1,}/[a-zA-Z0-9_\\-/]{1,}\\.(?:[" +
+    "a-zA-Z]{1,4}|action)(?:[\\?|#][^\"|']{0,}|))|([a-zA-Z0-9_\\-/]{1" +
+    ",}/[a-zA-Z0-9_\\-/]{3,}(?:[\\?|#][^\"|']{0,}|))|([a-zA-Z0-9_\\-]" +
+    "{1,}\\.(?:%s)(?:[\\?|#][^\"|']{0,}|))|\\d+\\.\\d+\\.\\d+\\.\\d+|" +
+    "(?:[a-zA-Z]{1,10}://|//))(?:\"|')"
+)
 REGEX = REGEX % _gen_endp_exts()
 
 def _split_list(l, c_len):
@@ -75,11 +77,21 @@ def process_chunk(c):
         return
 
 to_process = []
-for parent, _, files in os.walk(sys.argv[1]):
-    if len(files) == 0:
-        continue
+if os.path.isdir(sys.argv[1]):
+    for parent, _, files in os.walk(sys.argv[1]):
+        if len(files) == 0:
+            continue
 
-    to_process.append([parent, files])
+        to_process.append([parent, files])
+else:
+    to_process.append(
+        [
+            os.path.dirname(sys.argv[1]),
+            [os.path.basename(sys.argv[1])]
+        ]
+    )
+
+    WORKERS = 1
 
 halt_ev = threading.Event()
 workers = []
@@ -107,8 +119,15 @@ for result in results:
     formatted_group = []
 
     for group in result:
-        formatted_group.append("[ %d ] %s:%d:\t%s" %
-            (group['idx'], group['fpath'], group['line'], group['match']))
+        formatted_group.append("[ %d ] %s:%d:%s%s" %
+            (
+                group['idx'],
+                group['fpath'],
+                group['line'],
+                chr(0x20) * 4, # padding 4 spaces
+                group['match']
+            )
+        )
 
     formatted_results.append(formatted_group)
 
